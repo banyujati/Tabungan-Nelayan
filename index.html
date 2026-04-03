@@ -414,7 +414,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--gray-50);color:
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">No. HP / WhatsApp *</label>
-                <input class="form-control" id="ta-hp" placeholder="08xxx">
+                <input class="form-control" id="ta-hp" placeholder="08xxxxxxxxxx" maxlength="13" oninput="validateHP(this)">
               </div>
               <div class="form-group">
                 <label class="form-label">Tanggal Daftar</label>
@@ -460,7 +460,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--gray-50);color:
       </div>
       <div class="form-group">
         <label class="form-label">Jumlah Setoran (Rp) *</label>
-        <input class="form-control" id="setor-jumlah" type="number" placeholder="0" min="0">
+        <input class="form-control" id="setor-jumlah" type="text" placeholder="0" inputmode="numeric" oninput="fmtInput(this)">
       </div>
       <div class="form-group">
         <label class="form-label">Metode Pembayaran</label>
@@ -504,7 +504,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--gray-50);color:
       </div>
       <div class="form-group">
         <label class="form-label">Jumlah Penarikan (Rp) *</label>
-        <input class="form-control" id="tarik-jumlah" type="number" placeholder="0" min="0">
+        <input class="form-control" id="tarik-jumlah" type="text" placeholder="0" inputmode="numeric" oninput="fmtInput(this)">
       </div>
       <div class="form-group">
         <label class="form-label">Metode Pencairan</label>
@@ -529,7 +529,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--gray-50);color:
 <div class="alert" id="alert">✓ <span id="alert-msg"></span></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbzYAKsDWe6MW5Crn3yDnxIzhOUTGDyR9x5rlQXZdKYfNqA9LxHpvZ16uY0LsweHt3QucQ/exec';
+const API_URL = 'PASTE_URL_APPS_SCRIPT_KAMU_DISINI';
 
 // ══ AKUN BENDAHARA ══
 const BENDAHARA_LIST = [
@@ -643,6 +643,41 @@ function setBtnLoading(el, on, label) {
   if (!el) return; el.disabled=on; el.textContent=on?'⏳ Menyimpan...':label;
 }
 
+// ══ INPUT HELPERS ══
+function fmtInput(el) {
+  // Format angka dengan titik ribuan saat mengetik: 1000000 → 1.000.000
+  let raw = el.value.replace(/[^0-9]/g, '');
+  if (raw === '') { el.value = ''; return; }
+  el.value = parseInt(raw, 10).toLocaleString('id-ID');
+}
+
+function validateHP(el) {
+  // Hanya izinkan angka, max 13 digit
+  let val = el.value.replace(/[^0-9]/g, '');
+  el.value = val;
+  const hint = document.getElementById('hp-hint');
+  if (!hint) return;
+  if (val.length > 0 && !val.startsWith('08')) {
+    hint.textContent = '⚠️ Nomor HP harus dimulai dengan 08';
+    hint.style.color = 'var(--red)';
+  } else if (val.length > 0 && val.length < 10) {
+    hint.textContent = '⚠️ Nomor HP terlalu pendek';
+    hint.style.color = 'var(--red)';
+  } else if (val.length >= 10) {
+    hint.textContent = '✓ Format nomor HP valid';
+    hint.style.color = 'var(--green)';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function getHPError(val) {
+  if (!val) return 'No. HP wajib diisi';
+  if (!val.startsWith('08')) return 'Nomor HP harus dimulai dengan 08';
+  if (val.length < 10 || val.length > 13) return 'Nomor HP tidak valid (10-13 digit)';
+  return null;
+}
+
 // ══ UTILS ══
 const formatRp = n => 'Rp '+Number(n).toLocaleString('id-ID');
 const getSaldo  = id => { const a=anggota.find(x=>x.id===id); return a?a.saldo:0; };
@@ -750,7 +785,7 @@ function setTrxFilter(f,el) {
 // ══ MODAL SETOR ══
 function openSetor(pre) {
   selectedSetor=pre||null; metodeSetor='Tunai';
-  ['setor-search','setor-jumlah','setor-catatan'].forEach(i=>document.getElementById(i).value='');
+  ['setor-search','setor-jumlah','setor-catatan'].forEach(i=>{const el=document.getElementById(i);if(el)el.value=''});
   document.querySelectorAll('#modal-setor .metode-btn').forEach((b,i)=>b.classList.toggle('selected',i===0));
   renderNasabahOpts('setor','');
   if (pre) { const a=anggota.find(x=>x.id===pre); if(a){document.getElementById('setor-search').value=a.nama;renderNasabahOpts('setor',a.nama);} }
@@ -760,7 +795,7 @@ function openSetorDetail(){openSetor(activeDetail)}
 
 function openTarik(pre) {
   selectedTarik=pre||null; metodeTarik='Tunai';
-  ['tarik-search','tarik-jumlah','tarik-catatan'].forEach(i=>document.getElementById(i).value='');
+  ['tarik-search','tarik-jumlah','tarik-catatan'].forEach(i=>{const el=document.getElementById(i);if(el)el.value=''});
   document.getElementById('tarik-saldo-info').style.display='none';
   document.querySelectorAll('#modal-tarik .metode-btn').forEach((b,i)=>b.classList.toggle('selected',i===0));
   renderNasabahOpts('tarik','');
@@ -770,7 +805,7 @@ function openTarik(pre) {
 function openTarikDetail(){openTarik(activeDetail)}
 
 function renderNasabahOpts(m,q) {
-  const list=anggota.filter(a=>a.status==='Aktif'&&(q===''||a.nama.toLowerCase().includes(q.toLowerCase())));
+  const list=anggota.filter(a=>(q===''||a.nama.toLowerCase().includes(q.toLowerCase())));
   const selId=m==='setor'?selectedSetor:selectedTarik;
   document.getElementById(m+'-nasabah-list').innerHTML=list.map(a=>`<div class="nasabah-option ${selId===a.id?'selected':''}" onclick="selectNasabah('${m}','${a.id}')"><div><div class="n-name">${a.nama}</div><div class="n-saldo">${a.id} · Saldo ${formatRp(a.saldo)}</div></div></div>`).join('')||'<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:13px">Tidak ditemukan</div>';
 }
@@ -795,7 +830,7 @@ function selectMetode(m,v,el) {
 
 async function simpanSetor() {
   if(!selectedSetor) return showAlert('Pilih anggota dulu!',true);
-  const j=parseInt(document.getElementById('setor-jumlah').value);
+  const j=parseInt(document.getElementById('setor-jumlah').value.replace(/[^0-9]/g,''));
   if(!j||j<=0) return showAlert('Masukkan jumlah setoran!',true);
   const btn=document.getElementById('btn-simpan-setor');
   setBtnLoading(btn,true,'✓ Simpan Setoran');
@@ -809,7 +844,7 @@ async function simpanSetor() {
 
 async function simpanTarik() {
   if(!selectedTarik) return showAlert('Pilih anggota dulu!',true);
-  const j=parseInt(document.getElementById('tarik-jumlah').value);
+  const j=parseInt(document.getElementById('tarik-jumlah').value.replace(/[^0-9]/g,''));
   if(!j||j<=0) return showAlert('Masukkan jumlah penarikan!',true);
   const a=anggota.find(x=>x.id===selectedTarik);
   if(j>(a?a.saldo:0)) return showAlert('Saldo tidak cukup!',true);
@@ -826,7 +861,9 @@ async function simpanTarik() {
 async function tambahAnggota() {
   const nama=document.getElementById('ta-nama').value.trim();
   const hp=document.getElementById('ta-hp').value.trim();
-  if(!nama||!hp) return showAlert('Nama dan No. HP wajib diisi!',true);
+  const hpErr = getHPError(hp);
+  if(!nama) return showAlert('Nama wajib diisi!',true);
+  if(hpErr) return showAlert(hpErr,true);
   const btn=document.querySelector('#page-tambah-anggota .btn-primary');
   setBtnLoading(btn,true,'✓ Simpan Anggota');
   try {
