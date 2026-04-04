@@ -529,7 +529,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--gray-50);color:
 <div class="alert" id="alert">✓ <span id="alert-msg"></span></div>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbzYAKsDWe6MW5Crn3yDnxIzhOUTGDyR9x5rlQXZdKYfNqA9LxHpvZ16uY0LsweHt3QucQ/exec';
+const API_URL = 'PASTE_URL_APPS_SCRIPT_KAMU_DISINI';
 
 // ══ AKUN BENDAHARA ══
 const BENDAHARA_LIST = [
@@ -604,28 +604,60 @@ async function fetchAllData() {
   try {
     const [dA, dT] = await Promise.all([apiGet('getAnggota'), apiGet('getTransaksi')]);
     transaksi = dT.map(r => ({
-      id: String(r['ID_Transaksi']||''), id_anggota: String(r['ID_Anggota']||''),
-      tgl: fmtTgl(r['Tanggal']), jenis: String(r['Jenis']||''),
-      jumlah: Number(r['Jumlah']||0), metode: String(r['Metode']||''),
-      dicatat: String(r['Dicatat_Oleh']||''), catatan: String(r['Catatan']||'')
+      id         : String(r['ID_Transaksi'] || '').trim(),
+      id_anggota : String(r['ID_Anggota']   || '').trim(),
+      tgl        : fmtTgl(r['Tanggal']),
+      jenis      : String(r['Jenis']         || '').trim(),
+      jumlah     : Number(r['Jumlah']        || 0),
+      metode     : String(r['Metode']        || '').trim(),
+      dicatat    : String(r['Dicatat_Oleh']  || '').trim(),
+      catatan    : String(r['Catatan']       || '').trim()
     }));
     anggota = dA.map(r => {
-      const id    = String(r['ID_Anggota']||'');
-      const setor = transaksi.filter(t=>t.id_anggota===id&&t.jenis==='Setor').reduce((s,t)=>s+t.jumlah,0);
-      const tarik = transaksi.filter(t=>t.id_anggota===id&&t.jenis==='Tarik').reduce((s,t)=>s+t.jumlah,0);
-      return { id, nama:String(r['Nama']||''), hp:String(r['No_HP']||''), token:String(r['Kode_Token']||''),
-               tgl:fmtTgl(r['Tanggal_Daftar']), status:String(r['Status']||'Aktif'),
-               saldo:setor-tarik, catatan:String(r['Catatan']||'') };
+      const id    = String(r['ID_Anggota'] || '').trim();
+      const setor = transaksi.filter(t => t.id_anggota === id && t.jenis === 'Setor').reduce((s,t) => s + t.jumlah, 0);
+      const tarik = transaksi.filter(t => t.id_anggota === id && t.jenis === 'Tarik').reduce((s,t) => s + t.jumlah, 0);
+      return {
+        id,
+        nama    : String(r['Nama']          || '').trim(),
+        hp      : String(r['No_HP']         || '').trim(),
+        token   : String(r['Kode_Token']    || '').trim(),
+        tgl     : fmtTgl(r['Tanggal_Daftar']),
+        status  : String(r['Status']        || 'Aktif').trim(),
+        saldo   : setor - tarik,
+        catatan : String(r['Catatan']       || '').trim()
+      };
     });
   } catch(e) { showAlert('Gagal memuat data: '+e.message, true); }
   showLoading(false);
 }
 
 function fmtTgl(v) {
-  if (!v) return today();
-  if (typeof v==='string') return v.slice(0,10);
-  if (typeof v==='number') return new Date((v-25569)*86400*1000).toISOString().slice(0,10);
-  return String(v).slice(0,10);
+  if (!v || v === '') return today();
+  // Kalau sudah string format YYYY-MM-DD → langsung pakai
+  if (typeof v === 'string') {
+    // Bisa juga format DD/MM/YYYY dari Sheets
+    if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+    // Format lain → coba parse
+    const d = new Date(v);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    return today();
+  }
+  // Angka = Google Sheets date serial
+  // Serial 1 = 1 Jan 1900, tapi ada bug Lotus 1900 = leap year
+  // Formula yang benar: (serial - 25569) * 86400 * 1000
+  if (typeof v === 'number') {
+    // Pastikan hasilnya masuk akal (tahun 2000-2100)
+    const ms = (v - 25569) * 86400 * 1000;
+    const d  = new Date(ms);
+    const yr = d.getFullYear();
+    if (yr >= 2000 && yr <= 2100) return d.toISOString().slice(0, 10);
+    // Fallback: mungkin sudah dalam ms
+    const d2 = new Date(v);
+    if (!isNaN(d2) && d2.getFullYear() >= 2000) return d2.toISOString().slice(0, 10);
+    return today();
+  }
+  return today();
 }
 
 function showLoading(on) {
@@ -681,10 +713,25 @@ function getHPError(val) {
 // ══ UTILS ══
 const formatRp = n => 'Rp '+Number(n).toLocaleString('id-ID');
 const getSaldo  = id => { const a=anggota.find(x=>x.id===id); return a?a.saldo:0; };
-const getNama   = id => { const a=anggota.find(x=>x.id===id); return a?a.nama:id; };
+const getNama = id => {
+  if (!id) return '(tanpa nama)';
+  const a = anggota.find(x => x.id === String(id).trim());
+  return a ? a.nama : id;
+};
 const getInit   = n  => n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
 const today     = ()  => new Date().toISOString().slice(0,10);
-const fmtDate   = s  => { if(!s) return '-'; return new Date(s).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); };
+const fmtDate = s => {
+  if (!s || s === '') return '-';
+  // Format YYYY-MM-DD → parse manual agar tidak kena timezone offset
+  if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [yr, mo, dy] = s.split('-').map(Number);
+    const d = new Date(yr, mo - 1, dy);
+    return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+  }
+  const d = new Date(s);
+  if (isNaN(d)) return '-';
+  return d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+};
 
 // ══ PAGE NAV ══
 const pageTitles = { beranda:'Beranda', anggota:'Daftar Anggota', transaksi:'Riwayat Transaksi', detail:'Detail Anggota', 'tambah-anggota':'Tambah Anggota Baru' };
